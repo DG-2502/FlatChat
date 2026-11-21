@@ -15,22 +15,23 @@ func main() {
 	}
 	defer conn.Close()
 
-	serverReader := bufio.NewReader(conn)
-	stdin := bufio.NewScanner(os.Stdin)
+	done := make(chan struct{})
 
-	for {
-		fmt.Print("> ")
-		if !stdin.Scan() {
-			return
+	go func() {
+		defer close(done)
+		scanner := bufio.NewScanner(conn)
+		for scanner.Scan() {
+			fmt.Println(scanner.Text())
 		}
+	}()
 
-		fmt.Fprintf(conn, "%s\n", stdin.Text())
-
-		reply, err := serverReader.ReadString('\n')
-		if err != nil {
-			log.Println("read error:", err)
-			return
+	go func() {
+		stdin := bufio.NewScanner(os.Stdin)
+		for stdin.Scan() {
+			fmt.Fprintln(conn, stdin.Text())
 		}
-		fmt.Print(reply)
-	}
+	}()
+
+	<-done
+	fmt.Println("[disconnected]")
 }
